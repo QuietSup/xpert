@@ -1,0 +1,222 @@
+version: '0.3'
+
+services:
+
+  topic-classifier:
+    image: topic-classifier
+    hostname: topic-classifier
+    build:
+      context: ./back/topic-classifier
+      dockerfile: Dockerfile
+    volumes:
+      - ./back/topic-classifier:/app
+    ports:
+      - "5000:5000"
+    depends_on:
+      rabbitmq: 
+        condition: service_healthy
+    restart: on-failure
+
+  gateway:
+    image: gateway
+    hostname: gateway
+    build:
+      context: ./back/gateway
+      dockerfile: Dockerfile
+    volumes:
+      - ./back/gateway:/app
+      # - node_modules:/app/node_modules
+    ports:
+      - "3010:3010"
+    depends_on:
+      rabbitmq: 
+        condition: service_healthy
+    restart: on-failure
+
+  rabbitmq:
+    image: rabbitmq:3.13.0-management-alpine
+    hostname: rabbitmq
+    expose:
+      - 15672
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=root
+      - RABBITMQ_DEFAULT_PASS=root
+    restart: on-failure
+    healthcheck:
+        test: [ "CMD", "rabbitmqctl", "status"]
+        interval: 5s
+        timeout: 20s
+        retries: 10
+  
+  ocr:
+    image: ocr
+    hostname: ocr
+    build:
+      context: ./back/ocr
+      dockerfile: Dockerfile
+    volumes:
+      - ./back/ocr:/app
+      # - node_modules:/app/node_modules
+    # ports:
+      # - "3001:3001"
+    depends_on:
+      rabbitmq: 
+        condition: service_healthy
+    restart: on-failure
+
+
+  auth:
+    image: auth
+    hostname: auth
+    build:
+      context: ./back/auth
+      dockerfile: Dockerfile
+    volumes:
+      - ./back/auth:/app
+      # - node_modules:/app/node_modules
+    # ports:
+      # - "3001:3001"
+    depends_on:
+      rabbitmq: 
+        condition: service_healthy
+    restart: on-failure
+
+  
+  auth-db:
+    image: mongo
+    restart: on-failure
+    volumes:
+      - auth-db:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+
+  
+  users:
+    image: users
+    hostname: users
+    build:
+      context: ./back/users
+      dockerfile: Dockerfile
+    volumes:
+      - ./back/users:/app
+      # - node_modules:/app/node_modules
+    # ports:
+      # - "3001:3001"
+    depends_on:
+      rabbitmq: 
+        condition: service_healthy
+    restart: on-failure
+
+
+  users-db:
+    image: mongo
+    restart: on-failure
+    volumes:
+      - users-db:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+
+
+  classification-history:
+    image: classification-history
+    hostname: classification-history
+    build:
+      context: ./back/classification-history
+      dockerfile: Dockerfile
+    volumes:
+      - ./back/classification-history:/app
+      # - node_modules:/app/node_modules
+    # ports:
+      # - "3001:3001"
+    depends_on:
+      rabbitmq: 
+        condition: service_healthy
+      # classification-history-db:
+
+    restart: on-failure
+
+
+  clhistory-db:
+    image: mongo
+    restart: on-failure
+    volumes:
+      - clhistory-db:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+
+
+  feedbacks:
+    image: feedbacks
+    hostname: feedbacks
+    build:
+      context: ./back/feedbacks
+      dockerfile: Dockerfile
+    volumes:
+      - ./back/feedbacks:/app
+      # - node_modules:/app/node_modules
+    # ports:
+      # - "3001:3001"
+    depends_on:
+      rabbitmq: 
+        condition: service_healthy
+    restart: on-failure
+
+  feedbacks-db:
+    image: mongo
+    restart: on-failure
+    volumes:
+      - feedbacks-db:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+
+
+  feedbacks-db-ui:
+    image: mongo-express
+    restart: on-failure
+    environment:
+        # - ME_CONFIG_MONGODB_SERVER=feedbacks-db
+        # - ME_CONFIG_MONGODB_PORT=27017
+        ME_CONFIG_BASICAUTH_USERNAME: root
+        ME_CONFIG_BASICAUTH_PASSWORD: root
+        ME_CONFIG_MONGODB_ADMINUSERNAME: root
+        ME_CONFIG_MONGODB_ADMINPASSWORD: root
+        ME_CONFIG_MONGODB_URL: mongodb://root:root@feedbacks-db
+    depends_on:
+        - feedbacks-db
+    ports:
+      - "8081:8081"
+
+  
+  front:
+    image: front
+    hostname: front
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+    volumes:
+      - ./front:/app
+      # - node_modules:/app/node_modules
+    ports:
+      - "3030:3030"
+    depends_on:
+      - gateway
+      # classification-history-db:
+
+    restart: on-failure
+
+
+volumes:
+  # node_modules:
+  clhistory-db:
+  auth-db:
+  users-db:
+  feedbacks-db:
+
+
